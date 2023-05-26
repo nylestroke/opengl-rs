@@ -1,0 +1,12 @@
+[package]
+name = "opengl-rs"
+version = "0.1.0"
+edition = "2021"
+authors = ["Vladyslav <nylestroke> Potapenko"]
+
+[dependencies]
+gl = { path = "./lib/gl" }
+sdl2 = { version = "0.35.2", features = ["bundled", "static-link"] }
+
+[features]
+gl_debug = ["gl/debug"]
