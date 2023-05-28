@@ -1,5 +1,6 @@
 // Import dependencies
 use failure::err_msg;
+use render::buffer;
 use render::data;
 use resources::Resources;
 use std::path::Path;
@@ -16,20 +17,22 @@ extern crate render_derive;
 extern crate gl; // OpenGL
 extern crate sdl2; // SDL2
 
+// Extern crate for vertex attribute pointers
+extern crate vec_2_10_10_10;
+
 // Import render module from src/render.rs
 pub mod render;
 // Import resources module from src/resources.rs
 pub mod resources;
 
 // Define a vertex struct with position and color
-#[derive(VertexAttribPointers)]
-#[derive(Copy, Clone, Debug)]
+#[derive(VertexAttribPointers, Copy, Clone, Debug)]
 #[repr(C, packed)]
 struct Vertex {
     #[location = "0"]
     pos: data::VertVec3D,
     #[location = "1"]
-    color: data::VertVec3D,
+    color: data::VertRGBA,
 }
 
 // Entry point function
@@ -79,54 +82,31 @@ fn run() -> Result<(), failure::Error> {
         // positions      // colors
         Vertex {
             pos: (0.5, -0.5, 0.0).into(),
-            color: (1.0, 0.0, 0.0).into(),
+            color: (1.0, 0.0, 0.0, 1.0).into(),
         }, // bottom right
         Vertex {
             pos: (-0.5, -0.5, 0.0).into(),
-            color: (0.0, 1.0, 0.0).into(),
+            color: (0.0, 1.0, 0.0, 1.0).into(),
         }, // bottom left
         Vertex {
             pos: (0.0, 0.5, 0.0).into(),
-            color: (0.0, 0.0, 1.0).into(),
+            color: (0.0, 0.0, 1.0, 1.0).into(),
         }, // top
     ];
     // Request OpenGL to give one buffer name (as integer),
     // and write it into vertex buffer object (vbo)
-    let mut vbo: gl::types::GLuint = 0;
-    unsafe {
-        gl.GenBuffers(1, &mut vbo);
-    }
-
-    unsafe {
-        // Bind the buffer to the array buffer
-        gl.BindBuffer(gl::ARRAY_BUFFER, vbo);
-        gl.BufferData(
-            gl::ARRAY_BUFFER,                                                          // target
-            (vertices.len() * std::mem::size_of::<Vertex>()) as gl::types::GLsizeiptr, // size of data in bytes
-            vertices.as_ptr() as *const gl::types::GLvoid, // pointer to data
-            gl::STATIC_DRAW,                               // usage
-        );
-        gl.BindBuffer(gl::ARRAY_BUFFER, 0); // unbind the buffer
-    }
+    let vbo = buffer::ArrayBuffer::new(&gl);
+    vbo.bind();
+    vbo.static_draw_data(&vertices);
+    vbo.unbind();
 
     // Create vertex array object
-    let mut vao: gl::types::GLuint = 0;
-    unsafe {
-        gl.GenVertexArrays(1, &mut vao);
-    }
-
-    unsafe {
-        // Bind the vertex array object
-        gl.BindVertexArray(vao);
-        gl.BindBuffer(gl::ARRAY_BUFFER, vbo);
-
-        // Enable vertex attribute array
-        Vertex::vertex_attrib_pointers(&gl);
-
-        // Unbind the buffer and vertex array object
-        gl.BindBuffer(gl::ARRAY_BUFFER, 0);
-        gl.BindVertexArray(0);
-    }
+    let vao = buffer::VertexArray::new(&gl);
+    vao.bind();
+    vbo.bind();
+    Vertex::vertex_attrib_pointers(&gl);
+    vbo.unbind();
+    vao.unbind();
 
     // Set shared state for window
     unsafe {
@@ -164,9 +144,9 @@ fn run() -> Result<(), failure::Error> {
         shader_program.set_used();
 
         // Draw triangle
+        vao.bind();
         unsafe {
             // Bind the vertex array object
-            gl.BindVertexArray(vao);
             gl.DrawArrays(
                 gl::TRIANGLES, // mode
                 0,             // starting index in the enabled arrays

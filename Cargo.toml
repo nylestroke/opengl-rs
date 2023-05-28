@@ -9,6 +9,7 @@ gl = { path = "./lib/gl" }
 render_derive = { path = "./render_derive" }
 sdl2 = { version = "0.35.2", features = ["bundled", "static-link"] }
 failure = "0.1"
+vec-2-10-10-10 = { path = "./lib/vec-2-10-10-10" }
 
 [features]
 gl_debug = ["gl/debug"]

@@ -1,6 +1,8 @@
 {
   "rust-analyzer.linkedProjects": [
     ".\\render_derive\\Cargo.toml",
-    ".\\Cargo.toml"
+    ".\\Cargo.toml",
+    ".\\lib\\gl\\Cargo.toml",
+    ".\\lib\\vec-2-10-10-10\\Cargo.toml",
   ]
 }

@@ -164,6 +164,7 @@ dependencies = [
  "gl",
  "render_derive",
  "sdl2",
+ "vec-2-10-10-10",
  "walkdir",
 ]
 
@@ -278,6 +279,10 @@ name = "unicode-xid"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f962df74c8c05a667b5ee8bcf162993134c104e96440b663c8daa176dc772d8c"
+
+[[package]]
+name = "vec-2-10-10-10"
+version = "0.1.2"
 
 [[package]]
 name = "version-compare"
