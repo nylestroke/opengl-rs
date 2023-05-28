@@ -8,6 +8,10 @@ use std::path::Path;
 #[macro_use]
 extern crate failure;
 
+// Import render_derive crate to use custom derive macro
+#[macro_use]
+extern crate render_derive;
+
 // Extern crates are used to import external libraries
 extern crate gl; // OpenGL
 extern crate sdl2; // SDL2
@@ -18,35 +22,17 @@ pub mod render;
 pub mod resources;
 
 // Define a vertex struct with position and color
+#[derive(VertexAttribPointers)]
 #[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]
 struct Vertex {
+    #[location = "0"]
     pos: data::VertVec3D,
+    #[location = "1"]
     color: data::VertVec3D,
 }
 
-// Implement vertex attribute pointers for Vertex struct
-impl Vertex {
-    // Function that takes a reference to gl::Gl struct and enables vertex attribute array
-    fn vertex_attrib_pointers(gl: &gl::Gl) {
-        let stride = std::mem::size_of::<Self>(); // byte offset between consecutive attributes
-
-        let location = 0; // "layout (location = 0)" in vertex shader
-        let offset = 0; // offset of the first component
-
-        unsafe {
-            data::VertVec3D::vertex_attrib_pointer(gl, stride, location, offset);
-        }
-
-        let location = 1; // "layout (location = 1)" in vertex shader
-        let offset = offset + std::mem::size_of::<data::VertVec3D>(); // offset of the first component
-
-        unsafe {
-            data::VertVec3D::vertex_attrib_pointer(gl, stride, location, offset);
-        }
-    }
-}
-
+// Entry point function
 fn main() {
     if let Err(e) = run() {
         eprintln!("{}", failure_to_string(e));
@@ -54,7 +40,7 @@ fn main() {
     }
 }
 
-// Entry point function
+// Function which handles the main loop of the program
 fn run() -> Result<(), failure::Error> {
     let res = Resources::from_relative_exe_path(Path::new("assets")).map_err(err_msg)?;
 
