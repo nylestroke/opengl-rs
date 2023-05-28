@@ -1,7 +1,8 @@
 // Import dependencies
+use failure::err_msg;
+use render::data;
 use resources::Resources;
 use std::path::Path;
-use failure::err_msg;
 
 // Import failure crate to handle errors
 #[macro_use]
@@ -15,6 +16,36 @@ extern crate sdl2; // SDL2
 pub mod render;
 // Import resources module from src/resources.rs
 pub mod resources;
+
+// Define a vertex struct with position and color
+#[derive(Copy, Clone, Debug)]
+#[repr(C, packed)]
+struct Vertex {
+    pos: data::VertVec3D,
+    color: data::VertVec3D,
+}
+
+// Implement vertex attribute pointers for Vertex struct
+impl Vertex {
+    // Function that takes a reference to gl::Gl struct and enables vertex attribute array
+    fn vertex_attrib_pointers(gl: &gl::Gl) {
+        let stride = std::mem::size_of::<Self>(); // byte offset between consecutive attributes
+
+        let location = 0; // "layout (location = 0)" in vertex shader
+        let offset = 0; // offset of the first component
+
+        unsafe {
+            data::VertVec3D::vertex_attrib_pointer(gl, stride, location, offset);
+        }
+
+        let location = 1; // "layout (location = 1)" in vertex shader
+        let offset = offset + std::mem::size_of::<data::VertVec3D>(); // offset of the first component
+
+        unsafe {
+            data::VertVec3D::vertex_attrib_pointer(gl, stride, location, offset);
+        }
+    }
+}
 
 fn main() {
     if let Err(e) = run() {
@@ -54,14 +85,24 @@ fn run() -> Result<(), failure::Error> {
 
     // Create shaders from vertex and fragment sources
     // Linking shaders into program
-    let shader_program = render::Program::from_res(&gl, &res, "shaders/triangle").map_err(err_msg)?;
+    let shader_program =
+        render::Program::from_res(&gl, &res, "shaders/triangle").map_err(err_msg)?;
 
     // Create vertex array object with vertecies
-    let vertices: Vec<f32> = vec![
+    let vertices: Vec<Vertex> = vec![
         // positions      // colors
-        0.5, -0.5, 0.0, 1.0, 0.0, 0.0, // bottom right
-        -0.5, -0.5, 0.0, 0.0, 1.0, 0.0, // bottom left
-        0.0, 0.5, 0.0, 0.0, 0.0, 1.0, // top
+        Vertex {
+            pos: (0.5, -0.5, 0.0).into(),
+            color: (1.0, 0.0, 0.0).into(),
+        }, // bottom right
+        Vertex {
+            pos: (-0.5, -0.5, 0.0).into(),
+            color: (0.0, 1.0, 0.0).into(),
+        }, // bottom left
+        Vertex {
+            pos: (0.0, 0.5, 0.0).into(),
+            color: (0.0, 0.0, 1.0).into(),
+        }, // top
     ];
     // Request OpenGL to give one buffer name (as integer),
     // and write it into vertex buffer object (vbo)
@@ -74,8 +115,8 @@ fn run() -> Result<(), failure::Error> {
         // Bind the buffer to the array buffer
         gl.BindBuffer(gl::ARRAY_BUFFER, vbo);
         gl.BufferData(
-            gl::ARRAY_BUFFER,                                                       // target
-            (vertices.len() * std::mem::size_of::<f32>()) as gl::types::GLsizeiptr, // size of data in bytes
+            gl::ARRAY_BUFFER,                                                          // target
+            (vertices.len() * std::mem::size_of::<Vertex>()) as gl::types::GLsizeiptr, // size of data in bytes
             vertices.as_ptr() as *const gl::types::GLvoid, // pointer to data
             gl::STATIC_DRAW,                               // usage
         );
@@ -93,27 +134,8 @@ fn run() -> Result<(), failure::Error> {
         gl.BindVertexArray(vao);
         gl.BindBuffer(gl::ARRAY_BUFFER, vbo);
 
-        // Enable vertex attribute array at index 0
-        gl.EnableVertexAttribArray(0); // this is "layout (location = 0)" in vertex shader
-        gl.VertexAttribPointer(
-            0,         // index of the generic vertex attribute ("layout (location = 0)")
-            3,         // the number of components per generic vertex attribute
-            gl::FLOAT, // data type
-            gl::FALSE, // normalized (int-to-float conversion)
-            (6 * std::mem::size_of::<f32>()) as gl::types::GLint, // stride (byte offset between consecutive attributes)
-            std::ptr::null(),                                     // offset of the first component
-        );
-
-        // Enable vertex attribute array at index 1
-        gl.EnableVertexAttribArray(1); // this is "layout (location = 0)" in vertex shader
-        gl.VertexAttribPointer(
-            1,         // index of the generic vertex attribute ("layout (location = 0)")
-            3,         // the number of components per generic vertex attribute
-            gl::FLOAT, // data type
-            gl::FALSE, // normalized (int-to-float conversion)
-            (6 * std::mem::size_of::<f32>()) as gl::types::GLint, // stride (byte offset between consecutive attributes)
-            (3 * std::mem::size_of::<f32>()) as *const gl::types::GLvoid, // offset of the first component
-        );
+        // Enable vertex attribute array
+        Vertex::vertex_attrib_pointers(&gl);
 
         // Unbind the buffer and vertex array object
         gl.BindBuffer(gl::ARRAY_BUFFER, 0);
@@ -179,7 +201,13 @@ pub fn failure_to_string(e: failure::Error) -> String {
 
     let mut result = String::new();
 
-    for (i, cause) in e.iter_chain().collect::<Vec<_>>().into_iter().rev().enumerate() {
+    for (i, cause) in e
+        .iter_chain()
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .enumerate()
+    {
         if i > 0 {
             let _ = writeln!(&mut result, "   Which caused the following issue:");
         }
