@@ -1,4 +1,4 @@
-## Run command with debugging
+## Run application with debugging
 ```bash
 cargo run --features "gl_debug"
 ```
