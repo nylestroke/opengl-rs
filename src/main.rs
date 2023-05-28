@@ -1,5 +1,11 @@
 // Import dependencies
-use std::ffi::CString;
+use resources::Resources;
+use std::path::Path;
+use failure::err_msg;
+
+// Import failure crate to handle errors
+#[macro_use]
+extern crate failure;
 
 // Extern crates are used to import external libraries
 extern crate gl; // OpenGL
@@ -7,13 +13,24 @@ extern crate sdl2; // SDL2
 
 // Import render module from src/render.rs
 pub mod render;
+// Import resources module from src/resources.rs
+pub mod resources;
+
+fn main() {
+    if let Err(e) = run() {
+        eprintln!("{}", failure_to_string(e));
+        std::process::exit(1);
+    }
+}
 
 // Entry point function
-fn main() {
+fn run() -> Result<(), failure::Error> {
+    let res = Resources::from_relative_exe_path(Path::new("assets")).map_err(err_msg)?;
+
     // Initialize SDL2
-    let sdl = sdl2::init().unwrap();
+    let sdl = sdl2::init().map_err(err_msg)?;
     // Initialize SDL2 video subsystem
-    let video_subsystem = sdl.video().unwrap();
+    let video_subsystem = sdl.video().map_err(err_msg)?;
 
     //  Set OpenGL attributes
     let gl_attr = video_subsystem.gl_attr();
@@ -27,29 +44,17 @@ fn main() {
         .opengl() // Add OpenGL flag
         .resizable()
         .position_centered()
-        .build()
-        .unwrap();
-
+        .build()?;
     // Create OpenGL context
-    let _gl_context = window.gl_create_context().unwrap();
+    let _gl_context = window.gl_create_context().map_err(err_msg)?;
     // Load OpenGL function pointers
     let gl = gl::Gl::load_with(|s| {
         video_subsystem.gl_get_proc_address(s) as *const std::os::raw::c_void
     });
 
     // Create shaders from vertex and fragment sources
-    let vert_shader = render::Shader::from_vert_source(
-        &gl,
-        &CString::new(include_str!("triangle.vert")).unwrap(),
-    )
-    .unwrap();
-    let frag_shader = render::Shader::from_frag_source(
-        &gl,
-        &CString::new(include_str!("triangle.frag")).unwrap(),
-    )
-    .unwrap();
     // Linking shaders into program
-    let shader_program = render::Program::from_shaders(&gl, &[vert_shader, frag_shader]).unwrap();
+    let shader_program = render::Program::from_res(&gl, &res, "shaders/triangle").map_err(err_msg)?;
 
     // Create vertex array object with vertecies
     let vertices: Vec<f32> = vec![
@@ -123,7 +128,7 @@ fn main() {
 
     'main: loop {
         // Handle events
-        for event in sdl.event_pump().unwrap().poll_iter() {
+        for event in sdl.event_pump().map_err(err_msg)?.poll_iter() {
             match event {
                 // Quit event or escape key pressed
                 sdl2::event::Event::Quit { .. }
@@ -164,4 +169,32 @@ fn main() {
         // Swap the window
         window.gl_swap_window();
     }
+
+    Ok(())
+}
+
+// Function that takes any object that implements failure::Fail and prints out the chain of all causes:
+pub fn failure_to_string(e: failure::Error) -> String {
+    use std::fmt::Write;
+
+    let mut result = String::new();
+
+    for (i, cause) in e.iter_chain().collect::<Vec<_>>().into_iter().rev().enumerate() {
+        if i > 0 {
+            let _ = writeln!(&mut result, "   Which caused the following issue:");
+        }
+        let _ = write!(&mut result, "{}", cause);
+        if let Some(backtrace) = cause.backtrace() {
+            let backtrace_str = format!("{}", backtrace);
+            if backtrace_str.len() > 0 {
+                let _ = writeln!(&mut result, " This happened at {}", backtrace);
+            } else {
+                let _ = writeln!(&mut result);
+            }
+        } else {
+            let _ = writeln!(&mut result);
+        }
+    }
+
+    result
 }

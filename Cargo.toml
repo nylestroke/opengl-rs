@@ -7,6 +7,10 @@ authors = ["Vladyslav <nylestroke> Potapenko"]
 [dependencies]
 gl = { path = "./lib/gl" }
 sdl2 = { version = "0.35.2", features = ["bundled", "static-link"] }
+failure = "0.1"
 
 [features]
 gl_debug = ["gl/debug"]
+
+[build-dependencies]
+walkdir = "2.1"

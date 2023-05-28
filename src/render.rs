@@ -1,5 +1,31 @@
-// import namespace to avoid repeating `std::ffi` everywhere
+// Import namespace to avoid repeating `std::ffi` everywhere
 use std::ffi::{CStr, CString};
+
+use crate::resources::Resources;
+
+// Enum which holds all the error's that can occur
+#[derive(Debug, Fail)] // Dervice Fail, in addition to Debug which is derived by default
+pub enum Error {
+    #[fail(display = "Failed to load resource {}", name)]
+    ResourceLoad {
+        name: String,
+        #[cause] inner: crate::resources::Error,
+    },
+    #[fail(display = "Can not determine shader type for resource {}", name)]
+    CanNotDetermineShaderTypeForResource {
+        name: String,
+    },
+    #[fail(display = "Failed to compile shader {}: {}", name, message)]
+    CompileError {
+        name: String,
+        message: String,
+    },
+    #[fail(display = "Failed to link program {}: {}", name, message)]
+    LinkError {
+        name: String,
+        message: String,
+    },
+}
 
 // Newtype wrapper for program
 pub struct Program {
@@ -9,6 +35,30 @@ pub struct Program {
 
 // Implementation of program
 impl Program {
+    // Function to create program from resource
+    pub fn from_res(gl: &gl::Gl, res: &Resources, name: &str) -> Result<Program, Error> {
+        // Get possible file extensions
+        const POSSIBLE_EXT: [&str; 2] = [".vert", ".frag"];
+
+        // Get possible resource names
+        let resource_names = POSSIBLE_EXT
+            .iter()
+            .map(|file_extension| format!("{}{}", name, file_extension))
+            .collect::<Vec<String>>();
+
+        // Get possible shader types
+        let shaders = resource_names
+            .iter()
+            .map(|resource_name| Shader::from_res(gl, res, resource_name))
+            .collect::<Result<Vec<Shader>, Error>>()?;
+
+        // Create program from shaders
+        Program::from_shaders(gl, &shaders[..]).map_err(|message| Error::LinkError {
+            name: name.into(),
+            message,
+        })
+    }
+
     // Function to create program from shaders
     pub fn from_shaders(gl: &gl::Gl, shaders: &[Shader]) -> Result<Program, String> {
         let program_id = unsafe { gl.CreateProgram() };
@@ -94,6 +144,32 @@ pub struct Shader {
 
 // Implementation of shader
 impl Shader {
+    // Function to create shader from resource
+    pub fn from_res(gl: &gl::Gl, res: &Resources, name: &str) -> Result<Shader, Error> {
+        // Array of possible extensions
+        const POSSIBLE_EXT: [(&str, gl::types::GLenum); 2] =
+            [(".vert", gl::VERTEX_SHADER), (".frag", gl::FRAGMENT_SHADER)];
+
+        // Get shader kind
+        let shader_kind = POSSIBLE_EXT
+            .iter()
+            .find(|&&(file_extension, _)| name.ends_with(file_extension))
+            .map(|&(_, kind)| kind)
+            .ok_or_else(|| Error::CanNotDetermineShaderTypeForResource { name: name.into() })?;
+
+        // Load shader source
+        let source = res.load_cstring(name).map_err(|e| Error::ResourceLoad {
+            name: name.into(),
+            inner: e,
+        })?;
+
+        // Create shader
+        Shader::from_source(gl, &source, shader_kind).map_err(|message| Error::CompileError {
+            name: name.into(),
+            message,
+        })
+    }
+
     // Function to create shader from source
     pub fn from_source(
         gl: &gl::Gl,
